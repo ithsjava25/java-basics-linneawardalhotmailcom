@@ -44,7 +44,7 @@ Expected Command-Line Arguments:
 
 * --zone SE1|SE2|SE3|SE4 (required)
 * --date YYYY-MM-DD (optional, defaults to current date)
-* --sorted (optional, to display prices in ascending order)
+* --sorted (optional, to display prices in descending order)
 * --charging 2h|4h|8h (optional, to find optimal charging windows)
 * --help (optional, to display usage information)
 
