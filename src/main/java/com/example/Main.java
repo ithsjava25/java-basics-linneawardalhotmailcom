@@ -104,13 +104,28 @@ public class Main {
         for (int i = 0; i < priserIdag.size(); i++) {
                 sekPerKWh = priserIdag.get(i).sekPerKWh();
                 sum = sum + sekPerKWh;
-                average = sum / priserIdag.size();
+
         }
+        average = sum / priserIdag.size();
         System.out.println("Medelpris för idag är: " + String.format("%.2f", average) + " SEK/kWh");
 
+        //Hitta högsta och lägsta priset
+        double lowestPrice = Double.MAX_VALUE;
+        double highestPrice = Double.MIN_VALUE;
 
+        for (ElpriserAPI.Elpris pris : priserIdag) {
+            double onePrice = pris.sekPerKWh();
 
+            if (onePrice < lowestPrice) {
+                lowestPrice = onePrice;
+            }
+            if (onePrice > highestPrice) {
+                highestPrice = onePrice;
+            }
+        }
 
+        System.out.printf("Lägsta pris: %.2f SEK/kWh%n", lowestPrice);
+        System.out.printf("Högsta pris: %.2f SEK/kWh%n", highestPrice);
 
 
     }
