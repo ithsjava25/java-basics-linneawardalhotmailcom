@@ -294,9 +294,9 @@ public class Main {
         String medelprisStr = formatOre(medelpris);
 
         if (antalTimmar == 2) {
-            System.out.println("För att ladda elbilen billigast under " + antalTimmar + "h. " + " Påbörja laddning kl " + startStr + " till " + slutStr + ".");
+            System.out.println("Påbörja laddning kl " + startStr);
         } else if (antalTimmar == 4 || antalTimmar == 8) {
-            System.out.println("Påbörja laddning kl " + startStr + " och " + slutStr + ".");
+            System.out.println("Påbörja laddning kl " + startStr);
         } else {
             throw new IllegalArgumentException("Endast laddningstider på 2h, 4h och 8h stöds. Angivet värde: " + antalTimmar + "h");
         }
