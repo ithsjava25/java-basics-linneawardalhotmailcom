@@ -70,7 +70,7 @@ public class Main {
                 case "--charging":
                     if (i + 1 < args.length) {
                         charging = args[++i];
-                        //Kontrollerar att indatan (laddningstiden) är en av de tillåtna värdena
+                        //Kontrollerar att indatan (laddningstiden) är ett av de tillåtna värdena
                         if (!charging.equals("2h") && !charging.equals("4h") && !charging.equals("8h")) {
                             System.out.println("Ogiltig laddningstid. Giltiga laddningstider: 2h, 4h, 8h.");
                             return;
@@ -78,7 +78,6 @@ public class Main {
                     }
                     break;
                 case "--sorted":
-                    //todo: Här ska anrop till sorteringsmetoden göras
                     isSorted = true;
                     break;
                 case "--help":
@@ -129,75 +128,49 @@ public class Main {
 
         //For-loop som går igenom varje Elpris-objekt i listan priserIdag
         //Hämtar elpris-objektet vid index i från listan priserIdag och lagrar det i variabeln pris
-        //Lägger till objektet pris (ett Elpris-objekt) i listan priser (huvudlistan som byggs upp).
+        //Lägger till objektet pris (ett Elpris-objekt) i listan priser (huvudlistan som byggs upp)
         for (int i = 0; i < priserIdag.size(); i++) {
             Elpris timPris = priserIdag.get(i);
             priser.add(timPris);
         }
 
-
-
-        // Om användaren har valt --sorted eller --charging, hämtas även priser för imorgon
-        if (isSorted || charging != null) {
+        //Om klockan är efter 13:00, hämtas även morgondagens priser
+        //Detta görs genom att först kolla den aktuella tiden med LocalTime.now()
+        //Om den aktuella tiden är efter 13:00, hämtas morgondagens datum genom idag.plusDays(1)
+        //Sedan anropas getPriser(...) för morgondagens datum och de priserna läggs till i listan priser
+        LocalTime nu = LocalTime.now();
+        if (nu.isAfter(LocalTime.of(13, 0))) {
             LocalDate imorgon = idag.plusDays(1);
             List<Elpris> priserImorgon = elpriser.getPriser(imorgon.toString(), prisklass);
-
-            //Lägg till varje pris från imorgon till huvudlistan 'priser'
-            for (int i = 0; i < priserImorgon.size(); i++) {
-                Elpris timPris = priserImorgon.get(i);
-                priser.add(timPris);
+            //Om listan med morgondagens priser inte är tom, läggs de till i huvudlistan priser
+            if (!priserImorgon.isEmpty()) {
+                priser.addAll(priserImorgon);
+                //Annars skrivs ett meddelande ut om att morgondagens priser inte är tillgängliga
+            } else {
+                System.out.println("Morgondagens priser är inte tillgängliga. Visar endast dagens priser.");
             }
         }
 
+        //Om listan priser är tom, skrivs ett meddelande ut och programmet avslutas
         if (priser.isEmpty()) {
             System.out.println("Inga priser tillgängliga för valt datum och zon.");
             return;
         }
 
-        //Skapar ett objekt som kan formatera tal och anger att vi vill använda svensk formatering
         NumberFormat svenskFormat = NumberFormat.getNumberInstance(new Locale("sv", "SE"));
-        //Minst/max 2 decimaler skrivs ut
         svenskFormat.setMinimumFractionDigits(2);
         svenskFormat.setMaximumFractionDigits(2);
 
-        //Variabel för att hålla reda på summan av alla elpriser
-        double totalPris = 0.0;
-
-        //Loop som går igenom alla Elpris-objekt i listan priser
-        for (int i = 0; i < priser.size(); i++) {
-            Elpris timPris = priser.get(i); // Hämta elprisobjektet på index i
-            totalPris += timPris.sekPerKWh(); // Lägg till priset till totalPris
-        }
-
-        // Räkna och skriv ut medelpriset
-        double medelPris = (totalPris / priser.size()) * 100; // Omvandla till öre/kWh
+        //Anropar metoden beräknaMedelPris(...) för att räkna ut medelpriset för perioden
+        //Metoden tar listan priser som argument och returnerar medelpriset som en double
+        double medelPris = beräknaMedelPris(priser);
+        //Formaterar medelpriset till svensk formatering och skriver ut det
         String formateratMedelPris = svenskFormat.format(medelPris);
         System.out.println("Medelpris för perioden är: " + formateratMedelPris + " öre/kWh");
 
-        Elpris lägstaPris = null;
-        Elpris högstaPris = null;
-
-        for (Elpris pris : priser) {
-            if (lägstaPris == null || pris.sekPerKWh() < lägstaPris.sekPerKWh()) {
-                lägstaPris = pris;
-            }
-            if (högstaPris == null || pris.sekPerKWh() > högstaPris.sekPerKWh()) {
-                högstaPris = pris;
-            }
-        }
-
-        String formateratLägsta = svenskFormat.format(prisIOre(lägstaPris));
-        String formateratHögsta = svenskFormat.format(prisIOre(högstaPris));
-
-        String lägstaTid = lägstaPris.timeStart().toLocalTime().format(DateTimeFormatter.ofPattern("HH")) + "-" +
-                lägstaPris.timeEnd().toLocalTime().format(DateTimeFormatter.ofPattern("HH"));
-
-        String högstaTid = högstaPris.timeStart().toLocalTime().format(DateTimeFormatter.ofPattern("HH")) + "-" +
-                högstaPris.timeEnd().toLocalTime().format(DateTimeFormatter.ofPattern("HH"));
-
-        System.out.println("Lägsta pris: " + formateratLägsta + " öre/kWh (" + lägstaTid + ")");
-        System.out.println("Högsta pris: " + formateratHögsta + " öre/kWh (" + högstaTid + ")");
-
+        MinMaxResultat resultat = beräknaLägstaOchHögstaPris(priser);
+        String minMaxPriser = formateraUtskriftAvMinMaxResultat(resultat, svenskFormat);
+        System.out.println(minMaxPriser);
 
         //Sliding window algoritm för att hitta bästa laddningstid
         if (charging != null) {
@@ -220,9 +193,7 @@ public class Main {
             //If a valid window was found, print the result
             if (startHour != null) {
                 LocalTime startTime = startHour.timeStart().toLocalTime();
-                LocalTime endTime = startTime.plusHours(hoursToCharge);
                 double averageOre = (lowestTotal / hoursToCharge) * 100;
-                String formattedAverage = svenskFormat.format(averageOre);
 
                 skrivUtLaddningsFörslag(startTime, hoursToCharge, averageOre);
 
@@ -233,8 +204,8 @@ public class Main {
 
         if (isSorted) {
             sortPricesDescending(priser);
-            printSortedPrices(priser, svenskFormat); // Skriv ut i testformat
-            return; // Hoppa över resten av utskriften om sorterad lista visades
+            printSortedPrices(priser, svenskFormat);
+            return;
         }
 
         //Skriver ut priserna
@@ -244,6 +215,56 @@ public class Main {
                     + " Pris: " + formateratPris + " öre/kWh");
         }
 
+    }
+
+    public static record MinMaxResultat(ElpriserAPI.Elpris lägstaPris, ElpriserAPI.Elpris högstaPris) {}
+
+    public static MinMaxResultat beräknaLägstaOchHögstaPris(List<ElpriserAPI.Elpris> priser) {
+        if (priser == null || priser.isEmpty()) {
+            throw new IllegalArgumentException("Listan med priser är tom.");
+        }
+
+        ElpriserAPI.Elpris lägstaPris = priser.get(0);
+        ElpriserAPI.Elpris högstaPris = priser.get(0);
+
+        for (ElpriserAPI.Elpris pris : priser) {
+            if (pris.sekPerKWh() < lägstaPris.sekPerKWh()) {
+                lägstaPris = pris;
+            }
+            if (pris.sekPerKWh() > högstaPris.sekPerKWh()) {
+                högstaPris = pris;
+            }
+        }
+
+        return new MinMaxResultat(lägstaPris, högstaPris);
+    }
+
+    public static String formateraUtskriftAvMinMaxResultat(MinMaxResultat resultat, NumberFormat svenskFormat) {
+        String formateratLägsta = svenskFormat.format(prisIOre(resultat.lägstaPris()));
+        String formateratHögsta = svenskFormat.format(prisIOre(resultat.högstaPris()));
+
+        String lägstaTid = resultat.lägstaPris().timeStart().toLocalTime().format(DateTimeFormatter.ofPattern("HH")) + "-" +
+                resultat.lägstaPris().timeEnd().toLocalTime().format(DateTimeFormatter.ofPattern("HH"));
+
+        String högstaTid = resultat.högstaPris().timeStart().toLocalTime().format(DateTimeFormatter.ofPattern("HH")) + "-" +
+                resultat.högstaPris().timeEnd().toLocalTime().format(DateTimeFormatter.ofPattern("HH"));
+
+        return "Lägsta pris: " + formateratLägsta + " öre/kWh (" + lägstaTid + ")\n" +
+                "Högsta pris: " + formateratHögsta + " öre/kWh (" + högstaTid + ")";
+    }
+
+    private static double beräknaMedelPris(List<Elpris> priser) {
+        //Variabel för att hålla reda på summan av alla elpriser
+        double totalPris = 0.0;
+
+        //Loop som går igenom alla Elpris-objekt i listan priser
+        for (int i = 0; i < priser.size(); i++) {
+            Elpris timPris = priser.get(i); // Hämta timpriset på index i
+            totalPris += timPris.sekPerKWh(); // Lägg till timpriset till totalPris
+        }
+
+        //Returnerar medelpriset i öre
+        return (totalPris / priser.size()) * 100;
     }
 
     //Metod som sorterar priser i fallande ordning
@@ -290,7 +311,6 @@ public class Main {
 
     private static void skrivUtLaddningsFörslag(LocalTime startTid, int antalTimmar, double medelpris) {
         String startStr = startTid.format(DateTimeFormatter.ofPattern("HH:mm"));
-        String slutStr = startTid.plusHours(antalTimmar).format(DateTimeFormatter.ofPattern("HH:mm"));
         String medelprisStr = formatOre(medelpris);
 
         if (antalTimmar == 2) {
